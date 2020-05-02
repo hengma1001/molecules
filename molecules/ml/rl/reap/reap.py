@@ -23,7 +23,7 @@ class State:
         Effects
         -------
         Appends structures to data
-        
+
         """
         self.data = np.concatenate((self.data, structures))
 
