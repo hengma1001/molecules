@@ -64,11 +64,8 @@ def optics_clustering(X, min_samples):
 
     Return
     ------
-    opt_eps : float
-        optimal eps value given the X data
-
     outliers : np.ndarray
-        opt_eps associated array of outlier indices in the X data
+        array of outlier indices in the X data
 
     labels : np.ndarray
         all cluster labels
