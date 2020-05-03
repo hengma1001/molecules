@@ -6,30 +6,45 @@ from molecules.ml.unsupervised.cluster import optics_clustering
 # TODO: use h5py
 #       https://stackoverflow.com/questions/25655588/incremental-writes-to-hdf5-with-h5py?rq=1
 #       https://stackoverflow.com/questions/47072859/how-to-append-data-to-one-specific-dataset-in-a-hdf5-file-with-h5py#47074545
+
+# TODO: instead of storing the entire history to run optics
+#       clustering on, we could store a representative sample
 class State:
     def __init__(self):
         #State:    set of all discovered points (latent embeddings)
         #          on the landscape
-        self.data = np.array([])
+        self.structures = np.array([])
 
     def save(self, fname):
-        np.save(self.data, fname)
+        np.save(fname, self.structures)
 
     def load(self, fname):
-        self.data = np.load(fname)
+        self.structures = np.load(fname)
 
     def append(self, structures):
         """
         Effects
         -------
-        Appends structures to data
+        Appends new structures to state
 
         """
-        self.data = np.concatenate((self.data, structures))
+        self.structures = np.concatenate((self.structures, structures))
 
 
+def least_sampling_sort(cluster_labels, k):
+    # TODO: might not need to sort the k smallest values since we
+    #       only need the associated clusters but not the size
+    cluster_ids, counts = np.unique(cluster_labels, return_counts=True)
+    if k >= len(cluster_ids):
+        return cluster_ids[np.argsort(counts)]
+    partition = np.argpartition(counts, k)[:k]
+    return cluster_ids[partition[np.argsort(counts[partition])]]
 
-
+def least_sampling_set(cluster_labels, k):
+    cluster_ids, counts = np.unique(cluster_labels, return_counts=True)
+    if k >= len(cluster_ids):
+        return cluster_ids
+    return cluster_ids[np.argpartition(counts, k)[:k]]
 
 
 class REAP:
@@ -98,30 +113,26 @@ class REAP:
         # Run maximization routine on the _cumulative_reward
         # See https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html#scipy.optimize.minimize
         #  https://github.com/braceal/REAP-ReinforcementLearningBasedAdaptiveSampling/blob/master/MDSimulation/Src/RL/RLSim.py
+        pass
 
-    def find_best_structures(self, structures, min_samples):
+    def find_best_structures(self, structures, params):
         """
         Chooses protein structures to spawn new simulations
         based on least poplated clusters and the reward
         function of each cluster.
+
+        Note: params should contain min_samples = 10
         """
 
         # 1. Add incomming structures to state
         self.state.append(structures)
 
         # 2. Cluster the state into a set of L clusters using OPTICS
-        outlier_inds, labels = optics_clustering(self.state.data, min_samples)
+        outlier_inds, labels = optics_clustering(self.state.structures, params)
 
         # 3. Identify subset of clusters which contain the least
         #    number of data points
-        uniques, counts = np.unique(labels)
-        # uniques: [-1, 1, 2, 3, 4, 5, ..., num_clusters]
-        # counts:  [5, 10, 11, 15, 17]
-        least_sampled = counts[np.argpartition(counts, kth=self.least_samples)][:self.least_samples + 1]
-
-        # argpartition sorts the kth element with [... k ...] the lower half of the array having all values smaller than k
-        # might not need to sort the k smallest values since we only need the associated clusters but not the size
-
+        clusters = least_sampling_set(labels, self.least_samples)
 
         # 4. Compute reward for each structure in the subset of clusters
 
