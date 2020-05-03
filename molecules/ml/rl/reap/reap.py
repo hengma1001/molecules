@@ -1,6 +1,5 @@
 import numpy as np
-from collections import namedtuple
-from itertools import starmap, repeat
+from scipy.optimize import minimize
 from molecules.ml.unsupervised.cluster import optics_clustering
 
 # TODO: use h5py
@@ -54,13 +53,17 @@ class REAP:
                   on the landscape
     Action:       choosing protein structures to run more simulations on
     """
-    def __init__(self, num_order_params, least_samples=5, prior_weights=None):
+    def __init__(self, num_order_params, least_samples=5,
+                 num_spawns=10, prior_weights=None):
 
         # CVAE latent dimension
         self.num_order_params = num_order_params
 
         # Number of clusters to examine when computing rewards
         self.least_samples = least_samples
+
+        # Number of simulations to spawn each action
+        self.num_spawns = num_spawns
 
         # Same size as the number of order parameters. The ith weight
         # represents the importance of the ith order parameter.
@@ -109,11 +112,37 @@ class REAP:
     def _cumulative_reward(self, outliers, state):
         return sum(starmap(self._reward, zip(outliers, repeat(state))))
 
-    def _optimize_weights(self):
+    def _reward(self, clusters, weights):
+        # Compute reward for each structure in the subset of clusters
+        cluster_reward = np.dot(weights, np.abs(clusters - np.mean(cluster, axis=1)) / np.std(cluster, axis=1))
+
+        return 0.
+
+    def _optimize_weights(self, clusters):
         # Run maximization routine on the _cumulative_reward
         # See https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html#scipy.optimize.minimize
         #  https://github.com/braceal/REAP-ReinforcementLearningBasedAdaptiveSampling/blob/master/MDSimulation/Src/RL/RLSim.py
-        pass
+
+        def fun(x):
+            return -1. * self._reward(clusters, x)
+
+        delta = 0.1
+        constraints = ({'type': 'eq',
+                        'fun' : lambda x: np.array([np.sum(x)-1])}, # weights sum to one
+                       {'type': 'ineq',
+                        'fun' : lambda x: np.array([np.min(x)])}, # greater than zero
+                       {'type': 'ineq',
+                        'fun' : lambda x: np.array([-np.abs(x[0]-x0[0])+delta])}, # greater than zero
+                       {'type': 'ineq',
+                        'fun' : lambda x: np.array([-np.abs(x[1]-x0[1])+delta])}, # greater than zero
+                        {'type': 'ineq',
+                        'fun' : lambda x: np.array([-np.abs(x[2]-x0[2])+delta])}, # greater than zero
+                       {'type': 'ineq',
+                        'fun' : lambda x: np.array([-np.abs(x[3]-x0[3])+delta])}) # greater than zero
+
+        minimize(fun=fun, x0=self.weights,
+                 constraints=constraints, method='SLSQP')
+
 
     def find_best_structures(self, structures, params):
         """
@@ -128,17 +157,17 @@ class REAP:
         self.state.append(structures)
 
         # 2. Cluster the state into a set of L clusters using OPTICS
-        outlier_inds, labels = optics_clustering(self.state.structures, params)
+        _, labels = optics_clustering(self.state.structures, params)
 
         # 3. Identify subset of clusters which contain the least
         #    number of data points
-        clusters = least_sampling_set(labels, self.least_samples)
+        best_labels = least_sampling_set(labels, self.least_samples)
+        clusters = np.array([self.state.structures[labels == label] for label in best_labels])
 
-        # 4. Compute reward for each structure in the subset of clusters
+        # 4. Maximize reward using scipy to optimize weights
+        self.weights = self._optimize_weights(clusters)
 
-        # 5. Maximize reward using scipy to optimize weights
-
-        # 6. Using updated weights choose new structures which give
+        # 5. Using updated weights choose new structures which give
         #    the greatest reward
 
 
