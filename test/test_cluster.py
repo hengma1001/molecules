@@ -38,11 +38,11 @@ class TestClustering:
             assert False
 
     def test_optics_clustering(self):
-        min_samples = 5
+        params = {'min_samples': 5}
 
         # Attempts to correctly identify outliers with 10 different data sets
         for attempt in range(10):
-            outlier_inds, labels = optics_clustering(self.X, min_samples)
+            outlier_inds, labels = optics_clustering(self.X, params)
 
             if np.setdiff1d(self.outliers, self.X[outlier_inds]).size == 0:
                 break
