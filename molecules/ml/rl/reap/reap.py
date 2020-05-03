@@ -170,8 +170,19 @@ class REAP:
         # 5. Using updated weights choose new structures which give
         #    the greatest reward
 
+        # Compute array of rewards for each structure
+        # Negative for efficiently finding the best k
+        rewards = np.array([-1. * self._reward_structure(structure, self.weights)
+                            for structure in structures])
+        # Compute unsorted array of indices coresponding to the best structures
+        best_structure_inds = np.argpartition(rewards, self.num_spawns)[:self.num_spawns]
+
+        # TODO: should possible spawns be a subset of the incomming structures,
+        #       or should we be able to spawn and previous simulation structure
+        #       in the state. (Currently the first is implemented)
+
+        # TODO: consider whether we always want the same number of simulations spawned
+        #       or if there should be a schedule (large at start, less towards end).
 
 
-
-        action = None
-        return action
+        return best_structure_inds
