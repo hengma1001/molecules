@@ -2,6 +2,9 @@ import numpy as np
 from scipy.optimize import minimize
 from molecules.ml.unsupervised.cluster import optics_clustering
 
+# TODO: could we also reward structures by computing the latent embedding of
+#       the folded state and then attempting to minimize the distance to it?
+
 # TODO: use h5py
 #       https://stackoverflow.com/questions/25655588/incremental-writes-to-hdf5-with-h5py?rq=1
 #       https://stackoverflow.com/questions/47072859/how-to-append-data-to-one-specific-dataset-in-a-hdf5-file-with-h5py#47074545
@@ -135,7 +138,7 @@ class REAP:
                         'fun' : lambda x: np.array([-np.abs(x[0]-x0[0])+delta])}, # greater than zero
                        {'type': 'ineq',
                         'fun' : lambda x: np.array([-np.abs(x[1]-x0[1])+delta])}, # greater than zero
-                        {'type': 'ineq',
+                       {'type': 'ineq',
                         'fun' : lambda x: np.array([-np.abs(x[2]-x0[2])+delta])}, # greater than zero
                        {'type': 'ineq',
                         'fun' : lambda x: np.array([-np.abs(x[3]-x0[3])+delta])}) # greater than zero
