@@ -37,20 +37,44 @@ class State:
         self.stdev = np.std(self.structures, axis=0)
 
 
-def least_sampling_sort(cluster_labels, k):
-    # TODO: might not need to sort the k smallest values since we
-    #       only need the associated clusters but not the size
-    cluster_ids, counts = np.unique(cluster_labels, return_counts=True)
-    if k >= len(cluster_ids):
-        return cluster_ids[np.argsort(counts)]
-    partition = np.argpartition(counts, k)[:k]
-    return cluster_ids[partition[np.argsort(counts[partition])]]
+def topk(a, k):
+    """
+    Parameters
+    ----------
+    a : np.ndarray
+        array of dim (N,)
+
+    k : int
+        specifies which element to partition upon
+
+    Returns
+    -------
+    np.ndarray of length k containing indices of input array a
+    coresponding to the k smallest values in a.
+
+    """
+    return np.argpartition(a, k)[:k]
 
 def least_sampling_set(cluster_labels, k):
-    cluster_ids, counts = np.unique(cluster_labels, return_counts=True)
-    if k >= len(cluster_ids):
-        return cluster_ids
-    return cluster_ids[np.argpartition(counts, k)[:k]]
+    """
+    Parameters
+    ----------
+    cluster_labels : np.ndarray
+        array of dim (N,)
+
+    k : int
+        specifies which element to partition upon
+
+    Returns
+    -------
+    np.ndarray of length k containing the cluster labels
+    of the k smallest clusters.
+
+    """
+    labels, counts = np.unique(cluster_labels, return_counts=True)
+    if k >= len(labels):
+        return labels
+    return labels[topk(counts, k)]
 
 
 class REAP:
@@ -171,8 +195,8 @@ class REAP:
         # Negative for efficiently finding the best k
         rewards = np.array([-1. * self._reward_structure(structure, self.weights)
                             for structure in structures])
-        # Compute unsorted array of indices coresponding to the best structures
-        best_structure_inds = np.argpartition(rewards, self.num_spawns)[:self.num_spawns]
+        # Unsorted array of indices coresponding to the best structures
+        best_structure_inds = topk(rewards, self.num_spawns)
 
         # TODO: should possible spawns be a subset of the incomming structures,
         #       or should we be able to spawn and previous simulation structure
