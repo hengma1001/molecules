@@ -33,8 +33,8 @@ class State:
 
         """
         self.structures = np.concatenate((self.structures, structures))
-        self.mean = np.mean(self.structures, axis=1)
-        self.stdev = np.std(self.structures, axis=1)
+        self.mean = np.mean(self.structures, axis=0)
+        self.stdev = np.std(self.structures, axis=0)
 
 
 def least_sampling_sort(cluster_labels, k):
@@ -107,7 +107,8 @@ class REAP:
 
     def _reward_cluster(self, cluster, weights):
         # TODO: should each outlier be treated as it's own cluster?
-        return _reward_cluster(np.mean(cluster, axis=1), weights)
+        # Currently compressing each cluster to its mean
+        return _reward_cluster(np.mean(cluster, axis=0), weights)
 
     def _reward(self, clusters, weights):
         return sum(_reward_cluster(cluster, weights) for cluster in clusters)
