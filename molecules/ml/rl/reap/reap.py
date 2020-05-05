@@ -16,6 +16,8 @@ class State:
         #State:    set of all discovered points (latent embeddings)
         #          on the landscape
         self.structures = np.array([])
+        self.mean = 0.
+        self.stdev = 1.
 
     def save(self, fname):
         np.save(fname, self.structures)
@@ -23,14 +25,16 @@ class State:
     def load(self, fname):
         self.structures = np.load(fname)
 
-    def append(self, structures):
+    def update(self, structures):
         """
         Effects
         -------
-        Appends new structures to state
+        Appends new structures to state and updates mean and stdev
 
         """
         self.structures = np.concatenate((self.structures, structures))
+        self.mean = np.mean(self.structures, axis=1)
+        self.stdev = np.std(self.structures, axis=1)
 
 
 def least_sampling_sort(cluster_labels, k):
@@ -74,12 +78,11 @@ class REAP:
 
         self.state = State()
 
-        Stats = namedtuple('Stats', ['mean', 'stdev'])
-        self.stats = dict((op, Stats(0., 1.)) for op in self.order_parameters)
-
         # TODO: decide on which metrics to log
-        self.weight_log = None
-        self.state_log = None
+        # self.weight_log = None
+        # self.state_log = None
+
+        # TODO: pass in path to hdf5 file storing state
 
     def _init_weights(self, prior_weights):
         """
@@ -99,27 +102,15 @@ class REAP:
 
         return weights
 
-    def _reward(self, outlier, state):
-        # Calculate mean and variance of each order parameter for the new state
-        for op in self.order_parameters:
-            op_val = op(state)
-            self.stats[op] = Stats(np.mean(op_val), np.std(op_val))
+    def _reward_structure(self, structure, weights):
+        return np.dot(weights, np.abs((structure - self.state.mean)) / self.state.stdev)
 
-        # Computes reward for a single outlier given state dependent statistics
-        reward = lambda weight, op : weight * abs(op(outlier) - self.stats[op].mean) / self.stats[op].stdev
-
-        # Computes sum of rewards over all order parameters for a particular outlier
-        return sum(starmap(reward, zip(self.order_parameters, self.weights)))
-
-
-    def _cumulative_reward(self, outliers, state):
-        return sum(starmap(self._reward, zip(outliers, repeat(state))))
+    def _reward_cluster(self, cluster, weights):
+        # TODO: should each outlier be treated as it's own cluster?
+        return _reward_cluster(np.mean(cluster, axis=1), weights)
 
     def _reward(self, clusters, weights):
-        # Compute reward for each structure in the subset of clusters
-        cluster_reward = np.dot(weights, np.abs(clusters - np.mean(cluster, axis=1)) / np.std(cluster, axis=1))
-
-        return 0.
+        return sum(_reward_cluster(cluster, weights) for cluster in clusters)
 
     def _optimize_weights(self, clusters):
         # Run maximization routine on the _cumulative_reward
@@ -157,7 +148,7 @@ class REAP:
         """
 
         # 1. Add incomming structures to state
-        self.state.append(structures)
+        self.state.update(structures)
 
         # 2. Cluster the state into a set of L clusters using OPTICS
         _, labels = optics_clustering(self.state.structures, params)
