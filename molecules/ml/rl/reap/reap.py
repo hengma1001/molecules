@@ -110,7 +110,7 @@ class REAP:
         # Currently compressing each cluster to its mean
         return _reward_cluster(np.mean(cluster, axis=0), weights)
 
-    def _reward(self, clusters, weights):
+    def _cumulative_reward(self, clusters, weights):
         return sum(_reward_cluster(cluster, weights) for cluster in clusters)
 
     def _optimize_weights(self, clusters):
@@ -119,7 +119,7 @@ class REAP:
         #  https://github.com/braceal/REAP-ReinforcementLearningBasedAdaptiveSampling/blob/master/MDSimulation/Src/RL/RLSim.py
 
         def fun(x):
-            return -1. * self._reward(clusters, x)
+            return -1. * self._cumulative_reward(clusters, x)
 
         delta = 0.1
         constraints = ({'type': 'eq',
@@ -135,9 +135,11 @@ class REAP:
                        {'type': 'ineq',
                         'fun' : lambda x: np.array([-np.abs(x[3]-x0[3])+delta])}) # greater than zero
 
-        minimize(fun=fun, x0=self.weights,
-                 constraints=constraints, method='SLSQP')
+        result = minimize(fun=fun, x0=self.weights,
+                          constraints=constraints, method='SLSQP')
 
+        if result.success:
+            self.weights = result.weights
 
     def find_best_structures(self, structures, params):
         """
@@ -160,7 +162,7 @@ class REAP:
         clusters = np.array([self.state.structures[labels == label] for label in best_labels])
 
         # 4. Maximize reward using scipy to optimize weights
-        self.weights = self._optimize_weights(clusters)
+        self._optimize_weights(clusters)
 
         # 5. Using updated weights choose new structures which give
         #    the greatest reward
