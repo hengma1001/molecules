@@ -16,8 +16,8 @@ class State:
         #State:    set of all discovered points (latent embeddings)
         #          on the landscape
         self.structures = np.array([])
-        self.mean = 0.
-        self.stdev = 1.
+        self.mean = np.array([])
+        self.stdev = np.array([])
 
     def save(self, fname):
         np.save(fname, self.structures)
@@ -25,16 +25,37 @@ class State:
     def load(self, fname):
         self.structures = np.load(fname)
 
-    def update(self, structures):
+    def append(self, structures):
         """
         Effects
         -------
-        Appends new structures to state and updates mean and stdev
+        Appends new structures to state
 
         """
         self.structures = np.concatenate((self.structures, structures))
-        self.mean = np.mean(self.structures, axis=0)
-        self.stdev = np.std(self.structures, axis=0)
+
+    def update(self, labels):
+        """
+        Parameters
+        ----------
+        labels: np.ndarray
+            contains cluster label of each state in self.structures
+
+        Effects
+        -------
+        Computes mean,stdev for each cluster in self.structures
+        given the cluster labels.
+
+        """
+        means, stdevs = [], []
+
+        for label in np.unique(labels):
+            cluster = self.structures[labels == label]
+            means.append(np.mean(cluster, axis=0))
+            stdevs.append(np.std(cluster, axis=0))
+
+        self.mean = np.mean(means, axis=0)
+        self.stdev = np.std(stdevs, axis=0)
 
 
 def topk(a, k):
@@ -175,10 +196,13 @@ class REAP:
         """
 
         # 1. Add incomming structures to state
-        self.state.update(structures)
+        self.state.append(structures)
 
         # 2. Cluster the state into a set of L clusters using OPTICS
         _, labels = optics_clustering(self.state.structures, params)
+
+        # Update state with cluster stats
+        self.state.update(labels)
 
         # 3. Identify subset of clusters which contain the least
         #    number of data points
