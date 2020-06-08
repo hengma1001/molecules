@@ -2,6 +2,8 @@ import os
 import time
 import torch
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 class Callback:
     def __init__(self): pass
     def on_train_begin(self, logs): pass
@@ -116,7 +118,7 @@ class EmbeddingCallback(Callback):
     def on_epoch_end(self, epoch, logs):
         # TODO: may need to change the torch device
         idx = torch.randint(len(self.data), (1,))
-        embedding = logs['model'].encode(self.data[idx])
+        embedding = logs['model'].encode(self.data[idx].to(device))
         self.data_index.append(idx)
         self.embeddings.append(embedding)
 
